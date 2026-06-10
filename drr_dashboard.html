@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ДРР Дашборд</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #171c2e;
+    --border: #1e2640;
+    --accent: #3b82f6;
+    --accent2: #6366f1;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font: 'Inter', 'Helvetica Neue', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* === TOP BAR === */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .topbar-meta { color: var(--muted); font-size: 12px; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .badge-live {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 600;
+  }
+  .badge-live::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .filter-bar {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .filter-btn {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+  .filter-btn.active, .filter-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  /* === LAYOUT === */
+  .main {
+    padding: 20px 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  /* === KPI CARDS === */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .kpi-card.blue::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.red::before { background: var(--red); }
+  .kpi-card.yellow::before { background: var(--yellow); }
+  .kpi-card.purple::before { background: var(--accent2); }
+
+  .kpi-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+  .kpi-sub { margin-top: 6px; font-size: 11px; color: var(--muted); }
+  .kpi-delta { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+  .kpi-delta.up { background: rgba(34,197,94,0.12); color: var(--green); }
+  .kpi-delta.down { background: rgba(239,68,68,0.12); color: var(--red); }
+
+  /* === GRID 2-COL === */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* === PANEL === */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .panel-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(59,130,246,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(59,130,246,0.2);
+  }
+  .panel-body { padding: 16px 18px; }
+
+  /* === MANAGER CARDS === */
+  .mgr-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 16px 18px;
+  }
+  .mgr-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .mgr-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .mgr-card.selected { border-color: var(--accent); background: rgba(59,130,246,0.06); }
+  .mgr-name { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+  .mgr-stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .mgr-stat-label { font-size: 10px; color: var(--muted); }
+  .mgr-stat-value { font-size: 12px; font-weight: 600; }
+  .mgr-drr-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    margin-top: 10px;
+    overflow: hidden;
+  }
+  .mgr-drr-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+  .mgr-badge-row { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+  .mgr-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .mgr-badge.over { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+  .mgr-badge.sku { background: rgba(100,116,139,0.15); color: var(--muted); border: 1px solid var(--border); }
+
+  /* === TABLE === */
+  .table-wrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead tr { position: sticky; top: 0; z-index: 10; background: var(--surface); }
+  th {
+    padding: 9px 14px;
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(30,38,64,0.5);
+    white-space: nowrap;
+  }
+  tr:hover td { background: rgba(59,130,246,0.04); }
+  .td-tovar { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  .tag {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 600;
+  }
+  .tag.ok { background: rgba(34,197,94,0.1); color: var(--green); }
+  .tag.over { background: rgba(239,68,68,0.1); color: var(--red); }
+  .tag.none { background: rgba(100,116,139,0.1); color: var(--muted); }
+
+  .drr-inline {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .drr-bar-wrap { width: 48px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .drr-bar { height: 100%; border-radius: 2px; }
+
+  /* === CHART CANVAS === */
+  canvas { max-height: 220px; }
+
+  /* === SPARKLINE TABLE === */
+  .hours-badge {
+    font-size: 10px;
+    color: var(--muted);
+    padding: 2px 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  /* === SEARCH === */
+  .search-wrap { position: relative; }
+  .search-wrap input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 10px 6px 30px;
+    font-size: 12px;
+    width: 180px;
+    outline: none;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+
+  .sort-arrow { cursor: pointer; opacity: 0.4; }
+  .sort-arrow.active { opacity: 1; color: var(--accent); }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .mgr-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+
+<div id="loading-overlay" style="display:flex;position:fixed;inset:0;background:rgba(10,13,20,0.85);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+  <div style="width:40px;height:40px;border:3px solid #1e2640;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+  <div style="color:#64748b;font-size:13px">Загружаем данные из таблицы...</div>
+</div>
+<style>@keyframes spin{{to{{transform:rotate(360deg)}}}}</style>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">ДРР Дашборд</div>
+    <div class="topbar-meta" id="meta-date">—</div>
+  </div>
+  <div class="topbar-right">
+    <div class="filter-bar" id="filter-mgr">
+      <button class="filter-btn active" data-mgr="all">Все</button>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Поиск товара...">
+    </div>
+    <div style="font-size:11px;color:var(--muted)" id="last-refresh">—</div>
+    <button onclick="loadData()" style="padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:12px">↻ Обновить</button>
+    <div class="badge-live" id="badge-live">Сегодня</div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- KPI ROW -->
+  <div class="kpi-row" id="kpi-row">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Расходы (сегодня)</div>
+      <div class="kpi-value" id="kpi-rash">—</div>
+      <div class="kpi-sub" id="kpi-rash-sub">—</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Заказано шт.</div>
+      <div class="kpi-value" id="kpi-zak">—</div>
+      <div class="kpi-sub" id="kpi-zak-sub">—</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">Средний ДРР</div>
+      <div class="kpi-value" id="kpi-drr">—</div>
+      <div class="kpi-sub" id="kpi-drr-sub">—</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Превышений ДРР</div>
+      <div class="kpi-value" id="kpi-over">—</div>
+      <div class="kpi-sub" id="kpi-over-sub">из <span id="kpi-total-sku">—</span> SKU</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Освоение бюджета</div>
+      <div class="kpi-value" id="kpi-budget">—</div>
+      <div class="kpi-sub" id="kpi-budget-sub">—</div>
+    </div>
+  </div>
+
+  <!-- MANAGERS + CHARTS ROW -->
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-header">
+      <div class="panel-title">Менеджеры</div>
+      <span class="hours-badge" id="hours-badge">— ч</span>
+    </div>
+    <div class="mgr-grid" id="mgr-grid"></div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="grid-2" style="margin-bottom:16px">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Расходы по часам</div>
+        <span class="panel-badge" id="chart-mgr-label">все менеджеры</span>
+      </div>
+      <div class="panel-body"><canvas id="chart-hourly"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Топ SKU по расходам</div>
+        <span class="panel-badge">сегодня</span>
+      </div>
+      <div class="panel-body"><canvas id="chart-sku"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SKU TABLE -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">Все товары</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="panel-badge" id="table-count">—</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>АРТ WB</th>
+            <th>Товар</th>
+            <th>Менеджер</th>
+            <th>ЮР Лицо</th>
+            <th style="text-align:right;cursor:pointer" onclick="sortTable('rash')" title="Сортировать">Расходы ↕</th>
+            <th style="text-align:right;cursor:pointer" onclick="sortTable('zak')" title="Сортировать">Заказано ↕</th>
+            <th style="text-align:right">ДРР факт</th>
+            <th style="text-align:right">Лимит ДРР</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody id="sku-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== GOOGLE SHEETS LIVE LOADER =====
+const SHEET_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQk5o-V77cUEEfE4yt7ij80_2XfLPqX-abqDcHDQOcN0Y3RLITChec8gNmbABZgbAeiA8alVj5Wa-XY/pub?output=csv&gid=';
+const GID_CURR = '1271853524';
+const GID_PREV = '1596489949';
+
+let RAW = null;
+
+// ===== CSV PARSER =====
+function parseCSV(text) {
+  const rows = [];
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cols.push(cur); cur = ''; }
+      else { cur += c; }
+    }
+    cols.push(cur);
+    rows.push(cols);
+  }
+  return rows;
+}
+
+function sf(v) {
+  const f = parseFloat(v);
+  return isNaN(f) || !isFinite(f) ? 0 : f;
+}
+
+function parseSheet(rows) {
+  // Row 0 = empty/status
+  // Row 1 = meta: col1=updated, col5=date, col6=hours, col9=06:00...
+  // Row 2 = column headers (АРТ WB etc)
+  // Row 3 = empty
+  // Row 4+ = data
+
+  const meta = rows[1] || [];
+  const date_val = (meta[5] || '').slice(0,10);
+  const hours = parseInt(meta[6]) || 0;
+  const updated = (meta[1] || '').slice(0,16);
+
+  // Find time slot columns in meta row
+  const time_slots = {};
+  for (let i = 9; i < meta.length; i++) {
+    const v = (meta[i] || '').trim();
+    if (/^\d{1,2}:\d{2}/.test(v)) {
+      time_slots[i] = v.slice(0,5);
+    }
+  }
+  const slot_cols = Object.keys(time_slots).map(Number).sort((a,b)=>a-b);
+
+  const products = [];
+  for (let r = 4; r < rows.length; r++) {
+    const row = rows[r];
+    const art_raw = (row[1] || '').trim();
+    if (!art_raw || art_raw === 'АРТ WB') continue;
+    const art = art_raw;
+    const ur = (row[2] || '').trim();
+    const mgr = (row[3] || '').trim();
+    const tovar = (row[4] || '').trim();
+    const lim_r = sf(row[5]);
+    const lim_d = sf(row[6]);
+
+    const hourly = [];
+    for (const sc of slot_cols) {
+      if (sc + 6 < row.length) {
+        hourly.push({
+          h: time_slots[sc],
+          zak_li: sf(row[sc]),
+          zak: sf(row[sc+2]),
+          rash: sf(row[sc+4]),
+          drr: sf(row[sc+6])
+        });
+      }
+    }
+
+    let final = {zak_li:0,zak:0,rash:0,drr:0};
+    for (let i = hourly.length-1; i >= 0; i--) {
+      if (hourly[i].rash > 0 || hourly[i].zak > 0) { final = hourly[i]; break; }
+    }
+
+    const drr_status = lim_d > 0 && final.drr > lim_d ? 'over' : final.drr > 0 ? 'ok' : 'none';
+    products.push({ art, ur, mgr, tovar, lim_r, lim_d,
+      zak_li: final.zak_li, zak: final.zak, rash: final.rash, drr: final.drr,
+      drr_status, hourly });
+  }
+
+  const by_mgr = {};
+  for (const p of products) {
+    const m = p.mgr || 'Неизвестно';
+    if (!by_mgr[m]) by_mgr[m] = {zak:0,rash:0,lim_r:0,zak_li:0,count:0,over_drr:0,sku_active:0};
+    by_mgr[m].zak += p.zak;
+    by_mgr[m].rash += p.rash;
+    by_mgr[m].lim_r += p.lim_r;
+    by_mgr[m].zak_li += p.zak_li;
+    by_mgr[m].count++;
+    if (p.drr_status === 'over') by_mgr[m].over_drr++;
+    if (p.rash > 0) by_mgr[m].sku_active++;
+  }
+  for (const m in by_mgr) {
+    const v = by_mgr[m];
+    v.drr = v.zak > 0 ? v.rash / v.zak : 0;
+  }
+
+  return { date: date_val, hours, updated, products, by_mgr };
+}
+
+// ===== LOAD DATA =====
+let refreshTimer = null;
+
+async function loadData() {
+  setLoading(true);
+  try {
+    const [csvCurr, csvPrev] = await Promise.all([
+      fetch(SHEET_BASE + GID_CURR).then(r => r.text()),
+      fetch(SHEET_BASE + GID_PREV).then(r => r.text()),
+    ]);
+    const curr = parseSheet(parseCSV(csvCurr));
+    const prev = parseSheet(parseCSV(csvPrev));
+    RAW = { curr, prev };
+    renderAll();
+    renderMeta();
+    buildFilterButtons();
+    document.getElementById('last-refresh').textContent = 'Обновлено: ' + new Date().toLocaleTimeString('ru-RU');
+    setLoading(false);
+  } catch(e) {
+    console.error('Load error:', e);
+    document.getElementById('last-refresh').textContent = 'Ошибка загрузки: ' + e.message;
+    setLoading(false);
+  }
+}
+
+function setLoading(v) {
+  const el = document.getElementById('loading-overlay');
+  if (el) el.style.display = v ? 'flex' : 'none';
+}
+
+// Auto-refresh every 5 min
+function startAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(loadData, 5 * 60 * 1000);
+}
+
+// ===== STATE =====
+let selectedMgr = 'all';
+let sortCol = 'rash';
+let sortDir = -1;
+let searchVal = '';
+
+// ===== COLORS =====
+const MGR_COLORS = {
+  'Иван':  '#3b82f6',
+  'Илья':  '#6366f1',
+  'Роман': '#8b5cf6',
+  'Артем': '#06b6d4',
+  'Динар': '#f59e0b',
+  'Ангелина': '#ec4899',
+  'Неизвестно': '#475569',
+};
+
+function fmt(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'М';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'К';
+  return n.toFixed(0);
+}
+function fmtRub(n) {
+  if (n >= 1e6) return '₽' + (n/1e6).toFixed(2) + 'М';
+  if (n >= 1e3) return '₽' + (n/1e3).toFixed(1) + 'К';
+  return '₽' + n.toFixed(0);
+}
+function fmtDRR(v) { return (v*100).toFixed(2) + '%'; }
+function pct(a,b) { return b > 0 ? (a/b*100).toFixed(1)+'%' : '—'; }
+
+function getProducts() {
+  if (!RAW) return [];
+  return RAW.curr.products.filter(p => {
+    if (selectedMgr !== 'all' && p.mgr !== selectedMgr) return false;
+    if (searchVal && !p.tovar.toLowerCase().includes(searchVal) && !p.art.includes(searchVal)) return false;
+    return true;
+  });
+}
+
+function renderKPI() {
+  if (!RAW) return;
+  const ps = getProducts();
+  const totalRash = ps.reduce((s,p) => s + p.rash, 0);
+  const totalZak = ps.reduce((s,p) => s + p.zak, 0);
+  const totalLim = ps.reduce((s,p) => s + p.lim_r, 0);
+  const activePs = ps.filter(p => p.rash > 0 || p.zak > 0);
+  const avgDrr = activePs.length ? activePs.reduce((s,p) => s+p.drr,0)/activePs.length : 0;
+  const overCnt = ps.filter(p => p.drr_status === 'over').length;
+
+  const prevPs = RAW.prev.products.filter(p => selectedMgr === 'all' || p.mgr === selectedMgr);
+  const prevRash = prevPs.reduce((s,p) => s+p.rash, 0);
+  const prevZak = prevPs.reduce((s,p) => s+p.zak, 0);
+
+  document.getElementById('kpi-rash').textContent = fmtRub(totalRash);
+  const rashDelta = prevRash > 0 ? ((totalRash - prevRash) / prevRash * 100) : 0;
+  document.getElementById('kpi-rash-sub').innerHTML = prevRash > 0
+    ? `<span class="kpi-delta ${rashDelta > 0 ? 'up' : 'down'}">${rashDelta > 0 ? '▲' : '▼'} ${Math.abs(rashDelta).toFixed(1)}%</span> vs вчера`
+    : `лимит ${fmtRub(totalLim)}`;
+
+  document.getElementById('kpi-zak').textContent = fmt(totalZak);
+  const zakDelta = prevZak > 0 ? ((totalZak - prevZak) / prevZak * 100) : 0;
+  document.getElementById('kpi-zak-sub').innerHTML = prevZak > 0
+    ? `<span class="kpi-delta ${zakDelta > 0 ? 'up' : 'down'}">${zakDelta > 0 ? '▲' : '▼'} ${Math.abs(zakDelta).toFixed(1)}%</span> vs вчера`
+    : '—';
+
+  document.getElementById('kpi-drr').textContent = fmtDRR(avgDrr);
+  document.getElementById('kpi-drr-sub').textContent = 'средний по активным SKU';
+
+  document.getElementById('kpi-over').textContent = overCnt;
+  document.getElementById('kpi-over-sub').innerHTML = `из <span id="kpi-total-sku">${ps.length}</span> SKU`;
+
+  document.getElementById('kpi-budget').textContent = pct(totalRash, totalLim);
+  document.getElementById('kpi-budget-sub').textContent = `${fmtRub(totalRash)} / ${fmtRub(totalLim)}`;
+}
+
+function renderManagers() {
+  if (!RAW) return;
+  const grid = document.getElementById('mgr-grid');
+  const mgrs = Object.entries(RAW.curr.by_mgr)
+    .filter(([m]) => m !== 'Неизвестно')
+    .sort((a,b) => b[1].rash - a[1].rash);
+
+  grid.innerHTML = mgrs.map(([m, v]) => {
+    const c = MGR_COLORS[m] || '#6b7280';
+    const limPct = v.lim_r > 0 ? Math.min(v.rash / v.lim_r * 100, 100) : 0;
+    const fillColor = limPct > 85 ? '#ef4444' : limPct > 60 ? '#f59e0b' : '#22c55e';
+    const skuActive = RAW.curr.products.filter(p=>p.mgr===m && p.rash>0);
+    const avgDrr = skuActive.length ? skuActive.reduce((s,p)=>s+p.drr,0)/skuActive.length : 0;
+    return `<div class="mgr-card ${selectedMgr === m ? 'selected' : ''}" onclick="selectMgr('${m}')" style="border-top: 2px solid ${c}">
+      <div class="mgr-name" style="color:${c}">${m}</div>
+      <div class="mgr-stat-row"><span class="mgr-stat-label">Расходы</span><span class="mgr-stat-value">${fmtRub(v.rash)}</span></div>
+      <div class="mgr-stat-row"><span class="mgr-stat-label">Заказано</span><span class="mgr-stat-value">${fmt(v.zak)}</span></div>
+      <div class="mgr-stat-row"><span class="mgr-stat-label">Ср. ДРР</span><span class="mgr-stat-value" style="color:${avgDrr>0.1?'#ef4444':avgDrr>0.07?'#f59e0b':'#22c55e'}">${fmtDRR(avgDrr)}</span></div>
+      <div class="mgr-drr-bar"><div class="mgr-drr-fill" style="width:${limPct}%;background:${fillColor}"></div></div>
+      <div class="mgr-badge-row">
+        ${v.over_drr > 0 ? `<span class="mgr-badge over">⚠ ${v.over_drr} превыш.</span>` : ''}
+        <span class="mgr-badge sku">${v.count} SKU</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectMgr(m) {
+  selectedMgr = (selectedMgr === m) ? 'all' : m;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.mgr === selectedMgr));
+  renderAll();
+}
+
+let chartHourly, chartSku;
+
+function buildHourlyData() {
+  const ps = getProducts();
+  const hourMap = {};
+  for (const p of ps) {
+    for (const h of p.hourly) {
+      if (!hourMap[h.h]) hourMap[h.h] = 0;
+      hourMap[h.h] += h.rash;
+    }
+  }
+  const hours = Object.keys(hourMap).sort();
+  const vals = hours.map(h => hourMap[h]);
+  const incremental = vals.map((v,i) => i === 0 ? v : Math.max(0, v - vals[i-1]));
+  return { labels: hours, data: incremental };
+}
+
+function renderChartHourly() {
+  const { labels, data } = buildHourlyData();
+  const c = MGR_COLORS[selectedMgr] || '#3b82f6';
+  if (chartHourly) chartHourly.destroy();
+  const ctx = document.getElementById('chart-hourly').getContext('2d');
+  chartHourly = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: c+'55', borderColor: c, borderWidth:1.5, borderRadius:3 }] },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#64748b', font:{size:10} }, grid: { color:'#1e2640' } },
+        y: { ticks: { color:'#64748b', font:{size:10}, callback: v => fmtRub(v) }, grid: { color:'#1e2640' } }
+      },
+      responsive: true, maintainAspectRatio: true,
+    }
+  });
+  document.getElementById('chart-mgr-label').textContent = selectedMgr === 'all' ? 'все менеджеры' : selectedMgr;
+}
+
+function renderChartSku() {
+  const ps = getProducts().filter(p => p.rash > 0).sort((a,b) => b.rash - a.rash).slice(0,10);
+  if (chartSku) chartSku.destroy();
+  const ctx = document.getElementById('chart-sku').getContext('2d');
+  chartSku = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ps.map(p => p.tovar.length > 20 ? p.tovar.slice(0,20)+'…' : p.tovar),
+      datasets: [{ data: ps.map(p=>p.rash),
+        backgroundColor: ps.map(p=>p.drr_status==='over'?'#ef444455':'#3b82f655'),
+        borderColor: ps.map(p=>p.drr_status==='over'?'#ef4444':'#3b82f6'),
+        borderWidth:1.5, borderRadius:3 }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { color:'#94a3b8', font:{size:10} }, grid: { color:'#1e2640' } },
+        x: { ticks: { color:'#64748b', font:{size:10}, callback: v => fmtRub(v) }, grid: { color:'#1e2640' } }
+      },
+      responsive: true, maintainAspectRatio: true,
+    }
+  });
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  renderTable();
+}
+
+function renderTable() {
+  if (!RAW) return;
+  const ps = getProducts().sort((a,b) => (a[sortCol] - b[sortCol]) * sortDir);
+  const tbody = document.getElementById('sku-tbody');
+  document.getElementById('table-count').textContent = ps.length + ' SKU';
+  tbody.innerHTML = ps.map(p => {
+    const c = MGR_COLORS[p.mgr] || '#6b7280';
+    const drrPct = p.lim_d > 0 ? Math.min(p.drr / p.lim_d * 100, 100) : 0;
+    const barC = p.drr_status==='over'?'#ef4444':p.drr_status==='ok'?'#22c55e':'#475569';
+    return `<tr>
+      <td style="color:var(--muted);font-size:11px">${p.art}</td>
+      <td class="td-tovar" title="${p.tovar}">${p.tovar||'—'}</td>
+      <td><span style="color:${c};font-weight:600">${p.mgr||'—'}</span></td>
+      <td style="color:var(--muted)">${p.ur||'—'}</td>
+      <td style="text-align:right;font-weight:600">${p.rash>0?fmtRub(p.rash):'—'}</td>
+      <td style="text-align:right">${p.zak>0?fmt(p.zak):'—'}</td>
+      <td style="text-align:right">
+        <div class="drr-inline">
+          <div class="drr-bar-wrap"><div class="drr-bar" style="width:${drrPct}%;background:${barC}"></div></div>
+          <span style="color:${barC};font-weight:600">${p.drr>0?fmtDRR(p.drr):'—'}</span>
+        </div>
+      </td>
+      <td style="text-align:right;color:var(--muted)">${p.lim_d>0?fmtDRR(p.lim_d):'—'}</td>
+      <td><span class="tag ${p.drr_status}">${p.drr_status==='over'?'⚠ Превышен':p.drr_status==='ok'?'✓ Норма':'— Нет данных'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function buildFilterButtons() {
+  if (!RAW) return;
+  const bar = document.getElementById('filter-mgr');
+  bar.innerHTML = '<button class="filter-btn active" data-mgr="all" onclick="selectMgr(\'all\')">Все</button>';
+  Object.keys(RAW.curr.by_mgr).filter(m => m !== 'Неизвестно').forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (selectedMgr === m ? ' active' : '');
+    btn.dataset.mgr = m;
+    btn.textContent = m;
+    btn.onclick = () => selectMgr(m);
+    bar.appendChild(btn);
+  });
+}
+
+function renderMeta() {
+  if (!RAW) return;
+  const d = new Date(RAW.curr.date);
+  const opts = { day:'numeric', month:'long', year:'numeric' };
+  document.getElementById('meta-date').textContent =
+    d.toLocaleDateString('ru-RU', opts) + ' · обновлено ' + RAW.curr.updated.slice(0,10) + ' ' + RAW.curr.updated.slice(11,16);
+  document.getElementById('hours-badge').textContent = RAW.curr.hours + ' ч';
+  document.getElementById('badge-live').textContent = RAW.curr.hours < 23 ? `Сегодня · ${RAW.curr.hours}ч` : 'Вчера · итог';
+}
+
+document.getElementById('search-input').addEventListener('input', e => {
+  searchVal = e.target.value.toLowerCase();
+  renderTable();
+  renderKPI();
+});
+
+function renderAll() {
+  renderKPI();
+  renderManagers();
+  renderChartHourly();
+  renderChartSku();
+  renderTable();
+}
+
+// ===== INIT =====
+loadData();
+startAutoRefresh();
+</script>
+</body>
+</html>
